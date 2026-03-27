@@ -1,29 +1,62 @@
 import { RelayerTxType } from '@polymarket/builder-relayer-client';
 import { ethers } from 'ethers';
 import { ClaimExecutionConfig, ClaimRequestBody, WithdrawRequestBody } from './types';
-import { DEFAULT_RELAYER_URL, DEFAULT_RPC_URL, USDC_POS } from './constants';
-import { parseEthereumAddress, tryLoadBuilderConfig, parsePositiveTokenAmount } from './utils';
+import { parseEthereumAddress, buildBuilderConfigFromBody, parsePositiveTokenAmount } from './utils';
+import { USDC_POS } from './constants';
 
 export function resolveClaimConfig(payload: ClaimRequestBody): ClaimExecutionConfig {
-    const walletPrivateKey = (payload.walletPrivateKey || process.env.WALLET_PRIVATE_KEY)?.trim();
-    if (!walletPrivateKey) throw new Error('Falta walletPrivateKey (body) ou WALLET_PRIVATE_KEY (.env).');
-    const signerAddress = parseEthereumAddress('Endereço derivado da WALLET_PRIVATE_KEY', new ethers.Wallet(walletPrivateKey).address);
-    const proxyWallet = parseEthereumAddress('POLYMARKET_USER / proxyWallet', (payload.proxyWallet || process.env.POLYMARKET_USER || signerAddress).trim());
-    const alchemyUrl = (payload.alchemyUrl || process.env.ALCHEMY_URL || DEFAULT_RPC_URL).trim();
-    const relayerUrl = (payload.relayerUrl || process.env.RELAYER_URL || DEFAULT_RELAYER_URL).trim();
-    const relayerTxType = (payload.relayerTxType || process.env.RELAYER_TX_TYPE || 'SAFE') === 'PROXY' ? RelayerTxType.PROXY : RelayerTxType.SAFE;
+    const walletPrivateKey = payload.walletPrivateKey.trim();
+    const signerAddress = parseEthereumAddress('walletPrivateKey', new ethers.Wallet(walletPrivateKey).address);
+    const proxyWallet = parseEthereumAddress('proxyWallet', payload.proxyWallet.trim());
+    const alchemyUrl = payload.alchemyUrl.trim();
+    const relayerUrl = payload.relayerUrl.trim();
+    const relayerTxType = payload.relayerTxType === 'PROXY' ? RelayerTxType.PROXY : RelayerTxType.SAFE;
+    const redeemCreateUrl = payload.redeemCreateUrl?.trim();
 
-    const builderConfig = tryLoadBuilderConfig();
-    if (builderConfig?.isValid()) return { proxyWallet, walletPrivateKey, alchemyUrl, relayerUrl, relayerTxType, builderConfig };
+    const builderKey = payload.builderApiKey?.trim();
+    const builderSecret = payload.builderSecret?.trim();
+    const builderPassphrase = payload.builderPassphrase?.trim();
+    const hasBuilder = Boolean(builderKey && builderSecret && builderPassphrase);
+    const hasRelayerKeys = Boolean(payload.relayerApiKey?.trim() && payload.relayerApiKeyAddress?.trim());
 
-    const relayerApiKey = (payload.relayerApiKey || process.env.RELAYER_API_KEY)?.trim();
-    const relayerApiKeyAddressRaw = (payload.relayerApiKeyAddress || process.env.RELAYER_API_KEY_ADDRESS)?.trim();
-    if (!relayerApiKey || !relayerApiKeyAddressRaw) throw new Error('Faltam RELAYER_API_KEY e/ou RELAYER_API_KEY_ADDRESS.');
-    const relayerApiKeyAddress = parseEthereumAddress('RELAYER_API_KEY_ADDRESS', relayerApiKeyAddressRaw);
-    if (signerAddress.toLowerCase() !== relayerApiKeyAddress.toLowerCase()) {
-        throw new Error(`RELAYER_API_KEY_ADDRESS (${relayerApiKeyAddress}) precisa ser o mesmo da WALLET_PRIVATE_KEY (${signerAddress}).`);
+    if (hasBuilder) {
+        const builderConfig = buildBuilderConfigFromBody({
+            key: builderKey as string,
+            secret: builderSecret as string,
+            passphrase: builderPassphrase as string
+        });
+        if (!builderConfig.isValid()) throw new Error('Credenciais builder inválidas.');
+        return {
+            proxyWallet,
+            walletPrivateKey,
+            alchemyUrl,
+            relayerUrl,
+            relayerTxType,
+            builderConfig,
+            redeemCreateUrl: redeemCreateUrl || undefined
+        };
     }
-    return { proxyWallet, walletPrivateKey, alchemyUrl, relayerApiKey, relayerApiKeyAddress, relayerUrl, relayerTxType };
+
+    if (!hasRelayerKeys) {
+        throw new Error(
+            'Informe relayerApiKey + relayerApiKeyAddress, ou builderApiKey + builderSecret + builderPassphrase no body.'
+        );
+    }
+    const relayerApiKey = payload.relayerApiKey!.trim();
+    const relayerApiKeyAddress = parseEthereumAddress('relayerApiKeyAddress', payload.relayerApiKeyAddress!.trim());
+    if (signerAddress.toLowerCase() !== relayerApiKeyAddress.toLowerCase()) {
+        throw new Error(`relayerApiKeyAddress (${relayerApiKeyAddress}) precisa ser o mesmo da walletPrivateKey (${signerAddress}).`);
+    }
+    return {
+        proxyWallet,
+        walletPrivateKey,
+        alchemyUrl,
+        relayerApiKey,
+        relayerApiKeyAddress,
+        relayerUrl,
+        relayerTxType,
+        redeemCreateUrl: redeemCreateUrl || undefined
+    };
 }
 
 export function resolveWithdrawConfigFromBody(body: WithdrawRequestBody): {

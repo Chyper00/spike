@@ -15,8 +15,20 @@ export function buildOpenApiSpec() {
                 }
             },
             '/wallet-address': {
-                get: {
-                    summary: 'Endereço da wallet do .env',
+                post: {
+                    summary: 'Endereço público a partir da chave privada (body)',
+                    requestBody: {
+                        required: true,
+                        content: {
+                            'application/json': {
+                                schema: {
+                                    type: 'object',
+                                    required: ['walletPrivateKey'],
+                                    properties: { walletPrivateKey: { type: 'string' } }
+                                }
+                            }
+                        }
+                    },
                     responses: { '200': { description: 'Wallet address' } }
                 }
             },
@@ -27,9 +39,9 @@ export function buildOpenApiSpec() {
                         {
                             name: 'user',
                             in: 'query',
-                            required: false,
+                            required: true,
                             schema: { type: 'string' },
-                            description: 'Endereço da carteira'
+                            description: 'Endereço da carteira (0x...)'
                         }
                     ],
                     responses: { '200': { description: 'Claimable value' } }
@@ -69,22 +81,29 @@ export function buildOpenApiSpec() {
             },
             '/claim': {
                 post: {
-                    summary: 'Claim/redeem via relayer',
+                    summary: 'Claim/redeem via relayer (todos os segredos no body)',
                     requestBody: {
                         required: true,
                         content: {
                             'application/json': {
                                 schema: {
                                     type: 'object',
+                                    required: ['walletPrivateKey', 'proxyWallet', 'alchemyUrl', 'relayerUrl', 'relayerTxType'],
                                     properties: {
-                                        proxyWallet: { type: 'string' },
                                         walletPrivateKey: { type: 'string' },
+                                        proxyWallet: { type: 'string' },
                                         alchemyUrl: { type: 'string' },
+                                        relayerUrl: { type: 'string' },
+                                        relayerTxType: { type: 'string', enum: ['SAFE', 'PROXY'] },
                                         relayerApiKey: { type: 'string' },
                                         relayerApiKeyAddress: { type: 'string' },
-                                        relayerUrl: { type: 'string' },
-                                        relayerTxType: { type: 'string', enum: ['SAFE', 'PROXY'] }
-                                    }
+                                        builderApiKey: { type: 'string' },
+                                        builderSecret: { type: 'string' },
+                                        builderPassphrase: { type: 'string' },
+                                        redeemCreateUrl: { type: 'string' }
+                                    },
+                                    description:
+                                        'Autenticação: ou relayerApiKey + relayerApiKeyAddress, ou builderApiKey + builderSecret + builderPassphrase. redeemCreateUrl opcional (default interno).'
                                 }
                             }
                         }

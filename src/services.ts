@@ -11,9 +11,9 @@ import {
     rethrowIfRpcAuthFailed
 } from './utils';
 
-export async function fetchRedeemCreate(proxyWallet: string): Promise<RedeemCreateResponse> {
-    const redeemCreateUrl = process.env.REDEEM_CREATE_URL || DEFAULT_REDEEM_CREATE_URL;
-    const response = await fetch(redeemCreateUrl, {
+export async function fetchRedeemCreate(proxyWallet: string, redeemCreateUrl?: string): Promise<RedeemCreateResponse> {
+    const url = (redeemCreateUrl || DEFAULT_REDEEM_CREATE_URL).trim();
+    const response = await fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({ proxyWallet })
@@ -76,7 +76,7 @@ function buildRelayClient(config: ClaimExecutionConfig, wallet: ethers.Wallet): 
 export async function executeClaim(config: ClaimExecutionConfig) {
     const provider = createPolygonProvider(config.alchemyUrl);
     const wallet = new ethers.Wallet(config.walletPrivateKey, provider);
-    const redeem = await fetchRedeemCreate(config.proxyWallet);
+    const redeem = await fetchRedeemCreate(config.proxyWallet, config.redeemCreateUrl);
     const markets = getRedeemMarkets(redeem);
     if (markets.length === 0) throw new Error('Nenhum market resgatável retornado por /api/redeem/create.');
     const relayerClient = buildRelayClient(config, wallet);

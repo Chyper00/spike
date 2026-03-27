@@ -14,13 +14,17 @@ export type RedeemCreateResponse = {
 export type EncodedRedeemPayload = { markets?: RedeemCreateMarket[] };
 
 export type ClaimRequestBody = {
-    proxyWallet?: string;
-    walletPrivateKey?: string;
-    alchemyUrl?: string;
+    proxyWallet: string;
+    walletPrivateKey: string;
+    alchemyUrl: string;
+    relayerUrl: string;
+    relayerTxType: 'SAFE' | 'PROXY';
     relayerApiKey?: string;
     relayerApiKeyAddress?: string;
-    relayerUrl?: string;
-    relayerTxType?: 'SAFE' | 'PROXY';
+    builderApiKey?: string;
+    builderSecret?: string;
+    builderPassphrase?: string;
+    redeemCreateUrl?: string;
 };
 
 export type ClaimExecutionConfig = {
@@ -32,6 +36,7 @@ export type ClaimExecutionConfig = {
     relayerUrl: string;
     relayerTxType: RelayerTxType;
     builderConfig?: BuilderConfig;
+    redeemCreateUrl?: string;
 };
 
 export type WithdrawRequestBody = {

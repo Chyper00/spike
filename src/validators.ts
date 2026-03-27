@@ -1,18 +1,45 @@
 import { ethers } from 'ethers';
 import { ClaimRequestBody, GetWalletBalanceBody, WithdrawRequestBody, WithdrawToBinanceBody } from './types';
 
+function nonEmptyString(v: unknown): string | undefined {
+    if (typeof v !== 'string') return undefined;
+    const t = v.trim();
+    return t.length > 0 ? t : undefined;
+}
+
 export function validateClaimBody(body: unknown): ClaimRequestBody {
-    if (!body || typeof body !== 'object') return {};
-    const parsed = body as Partial<ClaimRequestBody>;
+    if (!body || typeof body !== 'object') throw new Error('Body inválido.');
+    const p = body as Partial<ClaimRequestBody>;
+    const missing: string[] = [];
+    if (!nonEmptyString(p.walletPrivateKey)) missing.push('walletPrivateKey');
+    if (!nonEmptyString(p.proxyWallet)) missing.push('proxyWallet');
+    if (!nonEmptyString(p.alchemyUrl)) missing.push('alchemyUrl');
+    if (!nonEmptyString(p.relayerUrl)) missing.push('relayerUrl');
+    if (p.relayerTxType !== 'SAFE' && p.relayerTxType !== 'PROXY') missing.push('relayerTxType (SAFE ou PROXY)');
+    if (missing.length) {
+        throw new Error(`Faltam ou estão vazios: ${missing.join(', ')}.`);
+    }
+    const relayerTxType = p.relayerTxType;
     return {
-        proxyWallet: typeof parsed.proxyWallet === 'string' ? parsed.proxyWallet.trim() : undefined,
-        walletPrivateKey: typeof parsed.walletPrivateKey === 'string' ? parsed.walletPrivateKey.trim() : undefined,
-        alchemyUrl: typeof parsed.alchemyUrl === 'string' ? parsed.alchemyUrl.trim() : undefined,
-        relayerApiKey: typeof parsed.relayerApiKey === 'string' ? parsed.relayerApiKey.trim() : undefined,
-        relayerApiKeyAddress: typeof parsed.relayerApiKeyAddress === 'string' ? parsed.relayerApiKeyAddress.trim() : undefined,
-        relayerUrl: typeof parsed.relayerUrl === 'string' ? parsed.relayerUrl.trim() : undefined,
-        relayerTxType: parsed.relayerTxType === 'PROXY' ? 'PROXY' : parsed.relayerTxType === 'SAFE' ? 'SAFE' : undefined
+        walletPrivateKey: String(p.walletPrivateKey).trim(),
+        proxyWallet: String(p.proxyWallet).trim(),
+        alchemyUrl: String(p.alchemyUrl).trim(),
+        relayerUrl: String(p.relayerUrl).trim(),
+        relayerTxType: relayerTxType as 'SAFE' | 'PROXY',
+        relayerApiKey: typeof p.relayerApiKey === 'string' ? p.relayerApiKey.trim() : undefined,
+        relayerApiKeyAddress: typeof p.relayerApiKeyAddress === 'string' ? p.relayerApiKeyAddress.trim() : undefined,
+        builderApiKey: typeof p.builderApiKey === 'string' ? p.builderApiKey.trim() : undefined,
+        builderSecret: typeof p.builderSecret === 'string' ? p.builderSecret.trim() : undefined,
+        builderPassphrase: typeof p.builderPassphrase === 'string' ? p.builderPassphrase.trim() : undefined,
+        redeemCreateUrl: typeof p.redeemCreateUrl === 'string' ? p.redeemCreateUrl.trim() : undefined
     };
+}
+
+export function validateWalletAddressBody(body: unknown): { walletPrivateKey: string } {
+    if (!body || typeof body !== 'object') throw new Error('Body inválido.');
+    const pk = (body as { walletPrivateKey?: unknown }).walletPrivateKey;
+    if (typeof pk !== 'string' || !pk.trim()) throw new Error('walletPrivateKey é obrigatório.');
+    return { walletPrivateKey: pk.trim() };
 }
 
 export function validateWithdrawBody(body: unknown): WithdrawRequestBody {

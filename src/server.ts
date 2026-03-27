@@ -1,16 +1,17 @@
 import { createServer } from 'http';
 import { ethers } from 'ethers';
 import { normalizePathname, parseEthereumAddress } from './utils';
-import { readJsonBody, validateClaimBody, validateGetWalletBalanceBody, validateWithdrawBody, validateWithdrawToBinanceBody } from './validators';
+import {
+    readJsonBody,
+    validateClaimBody,
+    validateGetWalletBalanceBody,
+    validateWalletAddressBody,
+    validateWithdrawBody,
+    validateWithdrawToBinanceBody
+} from './validators';
 import { executeClaim, executeGetWalletBalance, executeRelayerWithdraw, executeWithdrawToBinance } from './services';
 import { resolveClaimConfig, resolveWithdrawConfigFromBody } from './config';
 import { buildOpenApiSpec } from './openapi';
-
-function getWalletAddressFromEnv(): string {
-    const pk = process.env.WALLET_PRIVATE_KEY;
-    if (!pk) throw new Error('WALLET_PRIVATE_KEY não definida.');
-    return new ethers.Wallet(pk).address;
-}
 
 async function getClaimableValue(user: string): Promise<number | null> {
     const response = await fetch(`https://data-api.polymarket.com/value?user=${encodeURIComponent(user)}`);
@@ -64,26 +65,31 @@ export function buildServer() {
             return;
         }
 
-        if (req.method === 'GET' && pathname === '/wallet-address') {
-            try {
-                const walletAddress = getWalletAddressFromEnv();
-                res.writeHead(200, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ walletAddress }));
-            } catch (error) {
-                const message = error instanceof Error ? error.message : 'Erro interno';
-                res.writeHead(400, { 'Content-Type': 'application/json' });
-                res.end(JSON.stringify({ ok: false, error: message }));
-            }
+        if (req.method === 'POST' && pathname === '/wallet-address') {
+            (async () => {
+                try {
+                    const { walletPrivateKey } = validateWalletAddressBody(await readJsonBody(req));
+                    const walletAddress = new ethers.Wallet(walletPrivateKey).address;
+                    res.writeHead(200, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ walletAddress }));
+                } catch (error) {
+                    const message = error instanceof Error ? error.message : 'Erro interno';
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ ok: false, error: message }));
+                }
+            })();
             return;
         }
 
         if (req.method === 'GET' && pathname === '/claimable') {
             (async () => {
                 try {
-                    const user = url.searchParams.get('user') || process.env.POLYMARKET_USER || getWalletAddressFromEnv();
-                    const value = await getClaimableValue(parseEthereumAddress('user', user));
+                    const user = url.searchParams.get('user');
+                    if (!user?.trim()) throw new Error('Query obrigatória: ?user=0x...');
+                    const userAddr = parseEthereumAddress('user', user.trim());
+                    const value = await getClaimableValue(userAddr);
                     res.writeHead(200, { 'Content-Type': 'application/json' });
-                    res.end(JSON.stringify({ ok: true, user, value }));
+                    res.end(JSON.stringify({ ok: true, user: userAddr, value }));
                 } catch (error) {
                     const message = error instanceof Error ? error.message : 'Erro interno';
                     res.writeHead(400, { 'Content-Type': 'application/json' });

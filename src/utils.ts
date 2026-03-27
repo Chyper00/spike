@@ -1,6 +1,6 @@
 import { BuilderConfig } from '@polymarket/builder-signing-sdk';
 import { ethers } from 'ethers';
-import { DEFAULT_RPC_URL, ERC20_DECIMALS, POLYGON_NETWORK, USDC_NATIVE, USDC_POS } from './constants';
+import { ERC20_DECIMALS, POLYGON_NETWORK, USDC_NATIVE, USDC_POS } from './constants';
 
 export function createPolygonProvider(rpcUrl: string): ethers.providers.StaticJsonRpcProvider {
     return new ethers.providers.StaticJsonRpcProvider(rpcUrl.trim(), POLYGON_NETWORK);
@@ -45,19 +45,8 @@ export function describeUsdcToken(tokenChecksummed: string): string {
     return 'ERC-20 (usdcContract customizado)';
 }
 
-export function tryLoadBuilderConfig(): BuilderConfig | undefined {
-    const key = process.env.POLY_BUILDER_API_KEY?.trim() || process.env.BUILDER_API_KEY?.trim();
-    const secret = process.env.POLY_BUILDER_SECRET?.trim() || process.env.BUILDER_SECRET?.trim();
-    const passphrase =
-        process.env.POLY_BUILDER_PASSPHRASE?.trim() ||
-        process.env.BUILDER_PASS_PHRASE?.trim() ||
-        process.env.BUILDER_PASSPHRASE?.trim();
-    if (!key || !secret || !passphrase) return undefined;
-    return new BuilderConfig({ localBuilderCreds: { key, secret, passphrase } });
-}
-
-export function getRpcUrl(): string {
-    return process.env.ALCHEMY_URL || DEFAULT_RPC_URL;
+export function buildBuilderConfigFromBody(creds: { key: string; secret: string; passphrase: string }): BuilderConfig {
+    return new BuilderConfig({ localBuilderCreds: { key: creds.key, secret: creds.secret, passphrase: creds.passphrase } });
 }
 
 export function formatRelayerError(err: unknown): string {
