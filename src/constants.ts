@@ -4,7 +4,10 @@ export const CHAIN_ID = 137;
 export const POLYGON_NETWORK: ethers.providers.Networkish = { chainId: CHAIN_ID, name: 'matic' };
 
 export const DEFAULT_RPC_URL = 'https://polygon-rpc.com';
-export const DEFAULT_RELAYER_URL = 'https://relayer-v2.polymarket.com';
+/** Base do relayer (tentativa primeiro). O SDK concatena /nonce, /submit, etc. */
+export const RELAYER_URL_PRIMARY = 'https://relayer.polymarket.com/api/v1';
+/** Fallback se o primário falhar com erro de rede/5xx/404 retentável. */
+export const RELAYER_URL_FALLBACK = 'https://relayer-v2.polymarket.com';
 export const DEFAULT_REDEEM_CREATE_URL = 'https://polymarket.com/api/redeem/create';
 
 export const CTF_ADDRESS = '0x4d97dcd97ec945f40cf65f87097ace5ea0476045';

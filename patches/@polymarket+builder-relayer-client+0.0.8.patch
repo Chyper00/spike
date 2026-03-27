@@ -1,0 +1,22 @@
+diff --git a/node_modules/@polymarket/builder-relayer-client/dist/http-helpers/index.js b/node_modules/@polymarket/builder-relayer-client/dist/http-helpers/index.js
+index 8474432..2cf0719 100644
+--- a/node_modules/@polymarket/builder-relayer-client/dist/http-helpers/index.js
++++ b/node_modules/@polymarket/builder-relayer-client/dist/http-helpers/index.js
+@@ -41,7 +41,16 @@ class HttpClient {
+                     throw new Error(JSON.stringify(errPayload));
+                 }
+                 else {
+-                    const errPayload = { error: "connection error" };
++                    const errPayload = {
++                        error: "connection error",
++                        axiosMessage: err.message,
++                        code: err.code,
++                        errno: err.errno,
++                        syscall: err.syscall,
++                        hostname: err.hostname,
++                        address: err.address,
++                        port: err.port
++                    };
+                     console.error("connection error", errPayload);
+                     throw new Error(JSON.stringify(errPayload));
+                 }

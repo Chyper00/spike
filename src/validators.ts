@@ -14,7 +14,6 @@ export function validateClaimBody(body: unknown): ClaimRequestBody {
     if (!nonEmptyString(p.walletPrivateKey)) missing.push('walletPrivateKey');
     if (!nonEmptyString(p.proxyWallet)) missing.push('proxyWallet');
     if (!nonEmptyString(p.alchemyUrl)) missing.push('alchemyUrl');
-    if (!nonEmptyString(p.relayerUrl)) missing.push('relayerUrl');
     if (p.relayerTxType !== 'SAFE' && p.relayerTxType !== 'PROXY') missing.push('relayerTxType (SAFE ou PROXY)');
     if (missing.length) {
         throw new Error(`Faltam ou estão vazios: ${missing.join(', ')}.`);
@@ -24,7 +23,6 @@ export function validateClaimBody(body: unknown): ClaimRequestBody {
         walletPrivateKey: String(p.walletPrivateKey).trim(),
         proxyWallet: String(p.proxyWallet).trim(),
         alchemyUrl: String(p.alchemyUrl).trim(),
-        relayerUrl: String(p.relayerUrl).trim(),
         relayerTxType: relayerTxType as 'SAFE' | 'PROXY',
         relayerApiKey: typeof p.relayerApiKey === 'string' ? p.relayerApiKey.trim() : undefined,
         relayerApiKeyAddress: typeof p.relayerApiKeyAddress === 'string' ? p.relayerApiKeyAddress.trim() : undefined,
@@ -45,8 +43,8 @@ export function validateWalletAddressBody(body: unknown): { walletPrivateKey: st
 export function validateWithdrawBody(body: unknown): WithdrawRequestBody {
     if (!body || typeof body !== 'object') throw new Error('Body inválido.');
     const p = body as Partial<WithdrawRequestBody>;
-    if (!p.walletPrivateKey || !p.alchemyUrl || !p.relayerApiKey || !p.relayerApiKeyAddress || !p.relayerUrl || !p.recipient) {
-        throw new Error('Campos obrigatórios: walletPrivateKey, alchemyUrl, relayerApiKey, relayerApiKeyAddress, relayerUrl, recipient.');
+    if (!p.walletPrivateKey || !p.alchemyUrl || !p.relayerApiKey || !p.relayerApiKeyAddress || !p.recipient) {
+        throw new Error('Campos obrigatórios: walletPrivateKey, alchemyUrl, relayerApiKey, relayerApiKeyAddress, recipient.');
     }
     if (p.relayerTxType !== 'SAFE' && p.relayerTxType !== 'PROXY') {
         throw new Error("relayerTxType deve ser 'SAFE' ou 'PROXY'.");
@@ -59,7 +57,6 @@ export function validateWithdrawBody(body: unknown): WithdrawRequestBody {
         alchemyUrl: p.alchemyUrl.trim(),
         relayerApiKey: p.relayerApiKey.trim(),
         relayerApiKeyAddress: p.relayerApiKeyAddress.trim(),
-        relayerUrl: p.relayerUrl.trim(),
         relayerTxType: p.relayerTxType,
         recipient: p.recipient.trim(),
         amount: p.amount,

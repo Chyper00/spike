@@ -88,12 +88,11 @@ export function buildOpenApiSpec() {
                             'application/json': {
                                 schema: {
                                     type: 'object',
-                                    required: ['walletPrivateKey', 'proxyWallet', 'alchemyUrl', 'relayerUrl', 'relayerTxType'],
+                                    required: ['walletPrivateKey', 'proxyWallet', 'alchemyUrl', 'relayerTxType'],
                                     properties: {
                                         walletPrivateKey: { type: 'string' },
                                         proxyWallet: { type: 'string' },
                                         alchemyUrl: { type: 'string' },
-                                        relayerUrl: { type: 'string' },
                                         relayerTxType: { type: 'string', enum: ['SAFE', 'PROXY'] },
                                         relayerApiKey: { type: 'string' },
                                         relayerApiKeyAddress: { type: 'string' },
@@ -103,7 +102,7 @@ export function buildOpenApiSpec() {
                                         redeemCreateUrl: { type: 'string' }
                                     },
                                     description:
-                                        'Autenticação: ou relayerApiKey + relayerApiKeyAddress, ou builderApiKey + builderSecret + builderPassphrase. redeemCreateUrl opcional (default interno).'
+                                        'Autenticação: ou relayerApiKey + relayerApiKeyAddress, ou builderApiKey + builderSecret + builderPassphrase. redeemCreateUrl opcional (default interno). URL do relayer é fixa no servidor (primário + fallback).'
                                 }
                             }
                         }
@@ -125,7 +124,6 @@ export function buildOpenApiSpec() {
                                         'alchemyUrl',
                                         'relayerApiKey',
                                         'relayerApiKeyAddress',
-                                        'relayerUrl',
                                         'relayerTxType',
                                         'recipient',
                                         'amount'
@@ -135,7 +133,6 @@ export function buildOpenApiSpec() {
                                         alchemyUrl: { type: 'string' },
                                         relayerApiKey: { type: 'string' },
                                         relayerApiKeyAddress: { type: 'string' },
-                                        relayerUrl: { type: 'string' },
                                         relayerTxType: { type: 'string', enum: ['SAFE', 'PROXY'] },
                                         recipient: { type: 'string' },
                                         amount: { oneOf: [{ type: 'string' }, { type: 'number' }] },

@@ -1,6 +1,15 @@
 import { RelayClient, RelayerTxType, Transaction } from '@polymarket/builder-relayer-client';
 import { ethers } from 'ethers';
-import { CHAIN_ID, CTF_ADDRESS, DEFAULT_REDEEM_CREATE_URL, ERC20_DECIMALS, ERC20_MIN_ABI, USDC_POS } from './constants';
+import {
+    CHAIN_ID,
+    CTF_ADDRESS,
+    DEFAULT_REDEEM_CREATE_URL,
+    ERC20_DECIMALS,
+    ERC20_MIN_ABI,
+    RELAYER_URL_FALLBACK,
+    RELAYER_URL_PRIMARY,
+    USDC_POS
+} from './constants';
 import { ClaimExecutionConfig, RedeemCreateResponse, WithdrawToBinanceBody, GetWalletBalanceBody } from './types';
 import {
     createPolygonProvider,
@@ -8,7 +17,9 @@ import {
     formatRelayerError,
     parseEthereumAddress,
     parsePositiveTokenAmount,
-    rethrowIfRpcAuthFailed
+    rethrowIfRpcAuthFailed,
+    shouldRetryRelayerWithFallback,
+    urlHostForLog
 } from './utils';
 
 export async function fetchRedeemCreate(proxyWallet: string, redeemCreateUrl?: string): Promise<RedeemCreateResponse> {
@@ -64,8 +75,8 @@ async function ensureSafeIfNeeded(relayerClient: RelayClient, relayerTxType: Rel
     }
 }
 
-function buildRelayClient(config: ClaimExecutionConfig, wallet: ethers.Wallet): RelayClient {
-    const client = new RelayClient(config.relayerUrl, CHAIN_ID, wallet, config.builderConfig, config.relayerTxType);
+function buildRelayClient(config: ClaimExecutionConfig, wallet: ethers.Wallet, relayerUrl: string): RelayClient {
+    const client = new RelayClient(relayerUrl, CHAIN_ID, wallet, config.builderConfig, config.relayerTxType);
     if (!config.builderConfig?.isValid()) {
         client.httpClient.instance.defaults.headers.common.RELAYER_API_KEY = config.relayerApiKey as string;
         client.httpClient.instance.defaults.headers.common.RELAYER_API_KEY_ADDRESS = config.relayerApiKeyAddress as string;
@@ -73,62 +84,131 @@ function buildRelayClient(config: ClaimExecutionConfig, wallet: ethers.Wallet): 
     return client;
 }
 
+const RELAYER_URL_CHAIN = [RELAYER_URL_PRIMARY, RELAYER_URL_FALLBACK] as const;
+
 export async function executeClaim(config: ClaimExecutionConfig) {
     const provider = createPolygonProvider(config.alchemyUrl);
     const wallet = new ethers.Wallet(config.walletPrivateKey, provider);
-    const redeem = await fetchRedeemCreate(config.proxyWallet, config.redeemCreateUrl);
-    const markets = getRedeemMarkets(redeem);
-    if (markets.length === 0) throw new Error('Nenhum market resgatável retornado por /api/redeem/create.');
-    const relayerClient = buildRelayClient(config, wallet);
+    let stage = 'redeem_create';
+    let relayerUrl = RELAYER_URL_CHAIN[0];
     try {
-        await ensureSafeIfNeeded(relayerClient, config.relayerTxType);
-        const response = await relayerClient.execute(buildRedeemTransactions(markets), 'polymarket portfolio redeem');
-        const mined = await response.wait();
-        return {
-            ok: true,
-            mode: config.builderConfig?.isValid() ? 'relayer-redeem-builder-auth' : 'relayer-redeem',
-            signerAddress: wallet.address,
-            proxyWallet: config.proxyWallet,
-            relayerTxType: config.relayerTxType,
-            marketsCount: markets.length,
-            totalRedeemableValue: redeem.totalRedeemableValue ?? null,
-            transactionId: response.transactionID,
-            txHash: mined?.transactionHash ?? response.transactionHash ?? response.hash ?? null,
-            state: mined?.state ?? response.state,
-            redeemUrl: redeem.redeemUrl ?? null,
-            shortLink: redeem.shortLink ?? null
-        };
+        const redeem = await fetchRedeemCreate(config.proxyWallet, config.redeemCreateUrl);
+        stage = 'parse_markets';
+        const markets = getRedeemMarkets(redeem);
+        if (markets.length === 0) throw new Error('Nenhum market resgatável retornado por /api/redeem/create.');
+        let lastErr: unknown;
+        for (let i = 0; i < RELAYER_URL_CHAIN.length; i++) {
+            relayerUrl = RELAYER_URL_CHAIN[i];
+            try {
+                const relayerClient = buildRelayClient(config, wallet, relayerUrl);
+                stage = 'relayer_safe_deploy';
+                await ensureSafeIfNeeded(relayerClient, config.relayerTxType);
+                stage = 'relayer_execute';
+                const response = await relayerClient.execute(buildRedeemTransactions(markets), 'polymarket portfolio redeem');
+                stage = 'relayer_wait';
+                const mined = await response.wait();
+                return {
+                    ok: true,
+                    mode: config.builderConfig?.isValid() ? 'relayer-redeem-builder-auth' : 'relayer-redeem',
+                    relayerUrlUsed: relayerUrl,
+                    signerAddress: wallet.address,
+                    proxyWallet: config.proxyWallet,
+                    relayerTxType: config.relayerTxType,
+                    marketsCount: markets.length,
+                    totalRedeemableValue: redeem.totalRedeemableValue ?? null,
+                    transactionId: response.transactionID,
+                    txHash: mined?.transactionHash ?? response.transactionHash ?? response.hash ?? null,
+                    state: mined?.state ?? response.state,
+                    redeemUrl: redeem.redeemUrl ?? null,
+                    shortLink: redeem.shortLink ?? null
+                };
+            } catch (err) {
+                lastErr = err;
+                if (i < RELAYER_URL_CHAIN.length - 1 && shouldRetryRelayerWithFallback(err)) {
+                    console.warn('[claim] relayer indisponível, tentando fallback', {
+                        from: urlHostForLog(relayerUrl),
+                        to: urlHostForLog(RELAYER_URL_CHAIN[i + 1]),
+                        error: formatRelayerError(err)
+                    });
+                    continue;
+                }
+                throw err;
+            }
+        }
+        throw lastErr;
     } catch (err) {
-        throw new Error(formatRelayerError(err));
+        const formatted = formatRelayerError(err);
+        console.error('[claim]', {
+            stage,
+            proxyWallet: config.proxyWallet,
+            signer: wallet.address,
+            relayerTxType: config.relayerTxType,
+            relayerHost: urlHostForLog(relayerUrl),
+            redeemCreateHost: urlHostForLog(config.redeemCreateUrl || DEFAULT_REDEEM_CREATE_URL),
+            error: formatted
+        });
+        throw new Error(formatted);
     }
 }
 
 export async function executeRelayerWithdraw(config: ClaimExecutionConfig, recipient: string, amountRaw: ethers.BigNumber, tokenAddress: string) {
     const provider = createPolygonProvider(config.alchemyUrl);
     const wallet = new ethers.Wallet(config.walletPrivateKey, provider);
-    const relayerClient = buildRelayClient(config, wallet);
     const erc20 = new ethers.utils.Interface(['function transfer(address to, uint256 value) returns (bool)']);
     const tx: Transaction = { to: tokenAddress, data: erc20.encodeFunctionData('transfer', [recipient, amountRaw]), value: '0' };
+    let stage = 'relayer_safe_deploy';
+    let relayerUrl = RELAYER_URL_CHAIN[0];
     try {
-        await ensureSafeIfNeeded(relayerClient, config.relayerTxType);
-        const response = await relayerClient.execute([tx], 'polymarket withdraw via relayer');
-        const mined = await response.wait();
-        return {
-            ok: true,
-            mode: 'relayer-withdraw',
-            gasPaidBy: 'relayer',
-            signerAddress: wallet.address,
-            recipient,
-            tokenAddress,
-            amountRaw: amountRaw.toString(),
-            amount: ethers.utils.formatUnits(amountRaw, ERC20_DECIMALS),
-            relayerTxType: config.relayerTxType,
-            transactionId: response.transactionID,
-            txHash: mined?.transactionHash ?? response.transactionHash ?? response.hash ?? null,
-            state: mined?.state ?? response.state
-        };
+        let lastErr: unknown;
+        for (let i = 0; i < RELAYER_URL_CHAIN.length; i++) {
+            relayerUrl = RELAYER_URL_CHAIN[i];
+            try {
+                const relayerClient = buildRelayClient(config, wallet, relayerUrl);
+                stage = 'relayer_safe_deploy';
+                await ensureSafeIfNeeded(relayerClient, config.relayerTxType);
+                stage = 'relayer_execute';
+                const response = await relayerClient.execute([tx], 'polymarket withdraw via relayer');
+                stage = 'relayer_wait';
+                const mined = await response.wait();
+                return {
+                    ok: true,
+                    mode: 'relayer-withdraw',
+                    gasPaidBy: 'relayer',
+                    relayerUrlUsed: relayerUrl,
+                    signerAddress: wallet.address,
+                    recipient,
+                    tokenAddress,
+                    amountRaw: amountRaw.toString(),
+                    amount: ethers.utils.formatUnits(amountRaw, ERC20_DECIMALS),
+                    relayerTxType: config.relayerTxType,
+                    transactionId: response.transactionID,
+                    txHash: mined?.transactionHash ?? response.transactionHash ?? response.hash ?? null,
+                    state: mined?.state ?? response.state
+                };
+            } catch (err) {
+                lastErr = err;
+                if (i < RELAYER_URL_CHAIN.length - 1 && shouldRetryRelayerWithFallback(err)) {
+                    console.warn('[withdraw] relayer indisponível, tentando fallback', {
+                        from: urlHostForLog(relayerUrl),
+                        to: urlHostForLog(RELAYER_URL_CHAIN[i + 1]),
+                        error: formatRelayerError(err)
+                    });
+                    continue;
+                }
+                throw err;
+            }
+        }
+        throw lastErr;
     } catch (err) {
-        throw new Error(formatRelayerError(err));
+        const formatted = formatRelayerError(err);
+        console.error('[withdraw]', {
+            stage,
+            signer: wallet.address,
+            relayerTxType: config.relayerTxType,
+            relayerHost: urlHostForLog(relayerUrl),
+            error: formatted
+        });
+        throw new Error(formatted);
     }
 }
 

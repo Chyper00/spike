@@ -49,21 +49,90 @@ export function buildBuilderConfigFromBody(creds: { key: string; secret: string;
     return new BuilderConfig({ localBuilderCreds: { key: creds.key, secret: creds.secret, passphrase: creds.passphrase } });
 }
 
+type RelayerJsonError = {
+    status?: number;
+    statusText?: string;
+    data?: unknown;
+    error?: string;
+    axiosMessage?: string;
+    code?: string;
+    errno?: string | number;
+    syscall?: string;
+    hostname?: string;
+    address?: string;
+    port?: string | number;
+};
+
+function formatParsedRelayerPayload(parsed: RelayerJsonError): string {
+    if (parsed.status === 401 && parsed.data && typeof parsed.data === 'object' && parsed.data !== null && 'error' in parsed.data) {
+        const d = parsed.data as { error?: string };
+        if (d.error === 'invalid authorization') {
+            return (
+                'Relayer 401 invalid authorization. Verifique relayerApiKey e relayerApiKeyAddress. ' +
+                `Detalhe: ${JSON.stringify(parsed)}`
+            );
+        }
+    }
+    if (parsed.error === 'connection error') {
+        const parts = [
+            'Relayer: falha de rede (sem resposta HTTP).',
+            parsed.axiosMessage && `axios: ${parsed.axiosMessage}`,
+            parsed.code && `code: ${parsed.code}`,
+            parsed.errno !== undefined && `errno: ${parsed.errno}`,
+            parsed.syscall && `syscall: ${parsed.syscall}`,
+            parsed.hostname && `host: ${parsed.hostname}`,
+            parsed.address && `address: ${parsed.address}`,
+            parsed.port !== undefined && `port: ${parsed.port}`
+        ].filter(Boolean) as string[];
+        return parts.join(' | ');
+    }
+    if (parsed.error === 'request error') {
+        return `Relayer HTTP ${parsed.status ?? '?'} ${parsed.statusText ?? ''}: ${JSON.stringify(parsed.data)}`.trim();
+    }
+    try {
+        return JSON.stringify(parsed);
+    } catch {
+        return String(parsed);
+    }
+}
+
 export function formatRelayerError(err: unknown): string {
     if (!(err instanceof Error)) return String(err);
     const msg = err.message;
     try {
-        const parsed = JSON.parse(msg) as { status?: number; data?: { error?: string } };
-        if (parsed.status === 401 && parsed.data?.error === 'invalid authorization') {
-            return (
-                'Relayer 401 invalid authorization. Verifique RELAYER_API_KEY e RELAYER_API_KEY_ADDRESS. ' +
-                `Detalhe: ${msg}`
-            );
+        const parsed = JSON.parse(msg) as RelayerJsonError;
+        if (typeof parsed === 'object' && parsed !== null && 'error' in parsed) {
+            return formatParsedRelayerPayload(parsed);
         }
     } catch {
         // no-op
     }
     return msg;
+}
+
+/** True se vale a pena tentar o URL de relayer fallback (rede, 5xx, 404). */
+export function shouldRetryRelayerWithFallback(err: unknown): boolean {
+    const text = formatRelayerError(err);
+    const lower = text.toLowerCase();
+    if (lower.includes('401') && (lower.includes('invalid authorization') || lower.includes('relayer 401'))) return false;
+    if (lower.includes('403')) return false;
+    if (/\b(econnrefused|enotfound|etimedout|econnreset|eai_again|enetunreach|ehostunreach|ecanceled)\b/i.test(text)) return true;
+    if (lower.includes('falha de rede') || lower.includes('sem resposta http')) return true;
+    const m = /relayer http (\d+)/i.exec(text);
+    if (m) {
+        const code = parseInt(m[1], 10);
+        if (code === 404 || code === 502 || code === 503 || code === 504) return true;
+    }
+    return false;
+}
+
+/** Hostname para logs (evita path/query com segredos em URLs). */
+export function urlHostForLog(url: string): string {
+    try {
+        return new URL(url.trim()).host;
+    } catch {
+        return '(url inválida)';
+    }
 }
 
 export function rethrowIfRpcAuthFailed(err: unknown, context: string): never {

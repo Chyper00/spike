@@ -17,7 +17,6 @@ export type ClaimRequestBody = {
     proxyWallet: string;
     walletPrivateKey: string;
     alchemyUrl: string;
-    relayerUrl: string;
     relayerTxType: 'SAFE' | 'PROXY';
     relayerApiKey?: string;
     relayerApiKeyAddress?: string;
@@ -33,7 +32,6 @@ export type ClaimExecutionConfig = {
     alchemyUrl: string;
     relayerApiKey?: string;
     relayerApiKeyAddress?: string;
-    relayerUrl: string;
     relayerTxType: RelayerTxType;
     builderConfig?: BuilderConfig;
     redeemCreateUrl?: string;
@@ -44,7 +42,6 @@ export type WithdrawRequestBody = {
     alchemyUrl: string;
     relayerApiKey: string;
     relayerApiKeyAddress: string;
-    relayerUrl: string;
     relayerTxType: 'SAFE' | 'PROXY';
     recipient: string;
     amount: string | number;

@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "tsx watch main.ts",
     "start": "tsx main.ts",
-    "build": "tsc -p tsconfig.json"
+    "build": "tsc -p tsconfig.json",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@polymarket/builder-relayer-client": "^0.0.8",
@@ -16,6 +17,7 @@
   },
   "devDependencies": {
     "@types/node": "^24.6.1",
+    "patch-package": "^8.0.1",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2"
   }

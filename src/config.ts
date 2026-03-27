@@ -9,7 +9,6 @@ export function resolveClaimConfig(payload: ClaimRequestBody): ClaimExecutionCon
     const signerAddress = parseEthereumAddress('walletPrivateKey', new ethers.Wallet(walletPrivateKey).address);
     const proxyWallet = parseEthereumAddress('proxyWallet', payload.proxyWallet.trim());
     const alchemyUrl = payload.alchemyUrl.trim();
-    const relayerUrl = payload.relayerUrl.trim();
     const relayerTxType = payload.relayerTxType === 'PROXY' ? RelayerTxType.PROXY : RelayerTxType.SAFE;
     const redeemCreateUrl = payload.redeemCreateUrl?.trim();
 
@@ -30,7 +29,6 @@ export function resolveClaimConfig(payload: ClaimRequestBody): ClaimExecutionCon
             proxyWallet,
             walletPrivateKey,
             alchemyUrl,
-            relayerUrl,
             relayerTxType,
             builderConfig,
             redeemCreateUrl: redeemCreateUrl || undefined
@@ -53,7 +51,6 @@ export function resolveClaimConfig(payload: ClaimRequestBody): ClaimExecutionCon
         alchemyUrl,
         relayerApiKey,
         relayerApiKeyAddress,
-        relayerUrl,
         relayerTxType,
         redeemCreateUrl: redeemCreateUrl || undefined
     };
@@ -80,7 +77,6 @@ export function resolveWithdrawConfigFromBody(body: WithdrawRequestBody): {
             alchemyUrl: body.alchemyUrl,
             relayerApiKey: body.relayerApiKey,
             relayerApiKeyAddress: relayerKeyAddress,
-            relayerUrl: body.relayerUrl,
             relayerTxType: body.relayerTxType === 'PROXY' ? RelayerTxType.PROXY : RelayerTxType.SAFE
         },
         recipient,
