@@ -1,0 +1,63 @@
+import { BuilderConfig } from '@polymarket/builder-signing-sdk';
+import { RelayerTxType } from '@polymarket/builder-relayer-client';
+
+export type RedeemCreateMarket = { conditionId: string };
+
+export type RedeemCreateResponse = {
+    markets?: RedeemCreateMarket[];
+    marketsCount?: number;
+    totalRedeemableValue?: number;
+    redeemUrl?: string;
+    shortLink?: string;
+};
+
+export type EncodedRedeemPayload = { markets?: RedeemCreateMarket[] };
+
+export type ClaimRequestBody = {
+    proxyWallet?: string;
+    walletPrivateKey?: string;
+    alchemyUrl?: string;
+    relayerApiKey?: string;
+    relayerApiKeyAddress?: string;
+    relayerUrl?: string;
+    relayerTxType?: 'SAFE' | 'PROXY';
+};
+
+export type ClaimExecutionConfig = {
+    proxyWallet: string;
+    walletPrivateKey: string;
+    alchemyUrl: string;
+    relayerApiKey?: string;
+    relayerApiKeyAddress?: string;
+    relayerUrl: string;
+    relayerTxType: RelayerTxType;
+    builderConfig?: BuilderConfig;
+};
+
+export type WithdrawRequestBody = {
+    walletPrivateKey: string;
+    alchemyUrl: string;
+    relayerApiKey: string;
+    relayerApiKeyAddress: string;
+    relayerUrl: string;
+    relayerTxType: 'SAFE' | 'PROXY';
+    recipient: string;
+    amount: string | number;
+    tokenAddress?: string;
+};
+
+export type WithdrawToBinanceBody = {
+    walletPrivateKey: string;
+    alchemyUrl: string;
+    binanceAddress: string;
+    amount: string | number;
+    minAmountUsdc?: string | number;
+    usdcContract?: string;
+};
+
+export type GetWalletBalanceBody = {
+    alchemyUrl: string;
+    walletPrivateKey?: string;
+    address?: string;
+    usdcContract?: string;
+};
