@@ -102,7 +102,7 @@ export function buildOpenApiSpec() {
                                         redeemCreateUrl: { type: 'string' }
                                     },
                                     description:
-                                        'Autenticação: ou relayerApiKey + relayerApiKeyAddress, ou builderApiKey + builderSecret + builderPassphrase. redeemCreateUrl opcional (default interno). URL do relayer é fixa no servidor (primário + fallback).'
+                                        'Autenticação: ou relayerApiKey + relayerApiKeyAddress, ou builderApiKey + builderSecret + builderPassphrase. redeemCreateUrl opcional (default interno). Ordem do relayer: env POLYMARKET_RELAYER_PRIMARY / POLYMARKET_RELAYER_FALLBACK ou defaults no servidor (v2 → v1).'
                                 }
                             }
                         }

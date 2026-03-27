@@ -135,6 +135,30 @@ export function urlHostForLog(url: string): string {
     }
 }
 
+const REDEEM_CREATE_BODY_LOG_MAX = 2048;
+
+/** Corpo de erro HTTP para mensagens (truncado). Extrai `error`/`message` se JSON. */
+export function formatRedeemCreateErrorResponse(status: number, bodyText: string): string {
+    const trimmed = bodyText.trim();
+    const truncated =
+        trimmed.length > REDEEM_CREATE_BODY_LOG_MAX
+            ? `${trimmed.slice(0, REDEEM_CREATE_BODY_LOG_MAX)}…`
+            : trimmed;
+    if (!truncated) {
+        return `Falha no redeem/create: HTTP ${status} (resposta sem corpo)`;
+    }
+    try {
+        const j = JSON.parse(truncated) as { error?: unknown; message?: unknown };
+        const detail =
+            (typeof j.error === 'string' && j.error) ||
+            (typeof j.message === 'string' && j.message) ||
+            truncated;
+        return `Falha no redeem/create: HTTP ${status} — ${detail}`;
+    } catch {
+        return `Falha no redeem/create: HTTP ${status} — ${truncated}`;
+    }
+}
+
 export function rethrowIfRpcAuthFailed(err: unknown, context: string): never {
     const msg = err instanceof Error ? err.message : String(err);
     const lower = msg.toLowerCase();

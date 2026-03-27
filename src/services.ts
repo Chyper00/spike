@@ -6,14 +6,14 @@ import {
     DEFAULT_REDEEM_CREATE_URL,
     ERC20_DECIMALS,
     ERC20_MIN_ABI,
-    RELAYER_URL_FALLBACK,
-    RELAYER_URL_PRIMARY,
+    resolveRelayerUrlChain,
     USDC_POS
 } from './constants';
 import { ClaimExecutionConfig, RedeemCreateResponse, WithdrawToBinanceBody, GetWalletBalanceBody } from './types';
 import {
     createPolygonProvider,
     describeUsdcToken,
+    formatRedeemCreateErrorResponse,
     formatRelayerError,
     parseEthereumAddress,
     parsePositiveTokenAmount,
@@ -22,14 +22,34 @@ import {
     urlHostForLog
 } from './utils';
 
+const REDEEM_FETCH_USER_AGENT = 'spike-wallet-api/1';
+
 export async function fetchRedeemCreate(proxyWallet: string, redeemCreateUrl?: string): Promise<RedeemCreateResponse> {
     const url = (redeemCreateUrl || DEFAULT_REDEEM_CREATE_URL).trim();
+    const origin = process.env.POLYMARKET_REDEEM_ORIGIN?.trim();
+    const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'User-Agent': REDEEM_FETCH_USER_AGENT
+    };
+    if (origin) {
+        try {
+            const o = new URL(origin).origin;
+            headers.Origin = o;
+            headers.Referer = o.endsWith('/') ? o : `${o}/`;
+        } catch {
+            // ignora origin inválido
+        }
+    }
     const response = await fetch(url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        headers,
         body: JSON.stringify({ proxyWallet })
     });
-    if (!response.ok) throw new Error(`Falha no redeem/create: HTTP ${response.status}`);
+    if (!response.ok) {
+        const bodyText = await response.text();
+        throw new Error(formatRedeemCreateErrorResponse(response.status, bodyText));
+    }
     return (await response.json()) as RedeemCreateResponse;
 }
 
@@ -84,22 +104,20 @@ function buildRelayClient(config: ClaimExecutionConfig, wallet: ethers.Wallet, r
     return client;
 }
 
-const RELAYER_URL_CHAIN = [RELAYER_URL_PRIMARY, RELAYER_URL_FALLBACK] as const;
-type RelayerUrlCandidate = (typeof RELAYER_URL_CHAIN)[number];
-
 export async function executeClaim(config: ClaimExecutionConfig) {
+    const relayerChain = resolveRelayerUrlChain();
     const provider = createPolygonProvider(config.alchemyUrl);
     const wallet = new ethers.Wallet(config.walletPrivateKey, provider);
     let stage = 'redeem_create';
-    let relayerUrl: RelayerUrlCandidate = RELAYER_URL_CHAIN[0];
+    let relayerUrl = relayerChain[0];
     try {
         const redeem = await fetchRedeemCreate(config.proxyWallet, config.redeemCreateUrl);
         stage = 'parse_markets';
         const markets = getRedeemMarkets(redeem);
         if (markets.length === 0) throw new Error('Nenhum market resgatável retornado por /api/redeem/create.');
         let lastErr: unknown;
-        for (let i = 0; i < RELAYER_URL_CHAIN.length; i++) {
-            relayerUrl = RELAYER_URL_CHAIN[i];
+        for (let i = 0; i < relayerChain.length; i++) {
+            relayerUrl = relayerChain[i];
             try {
                 const relayerClient = buildRelayClient(config, wallet, relayerUrl);
                 stage = 'relayer_safe_deploy';
@@ -125,10 +143,10 @@ export async function executeClaim(config: ClaimExecutionConfig) {
                 };
             } catch (err) {
                 lastErr = err;
-                if (i < RELAYER_URL_CHAIN.length - 1 && shouldRetryRelayerWithFallback(err)) {
+                if (i < relayerChain.length - 1 && shouldRetryRelayerWithFallback(err)) {
                     console.warn('[claim] relayer indisponível, tentando fallback', {
                         from: urlHostForLog(relayerUrl),
-                        to: urlHostForLog(RELAYER_URL_CHAIN[i + 1]),
+                        to: urlHostForLog(relayerChain[i + 1]),
                         error: formatRelayerError(err)
                     });
                     continue;
@@ -153,16 +171,17 @@ export async function executeClaim(config: ClaimExecutionConfig) {
 }
 
 export async function executeRelayerWithdraw(config: ClaimExecutionConfig, recipient: string, amountRaw: ethers.BigNumber, tokenAddress: string) {
+    const relayerChain = resolveRelayerUrlChain();
     const provider = createPolygonProvider(config.alchemyUrl);
     const wallet = new ethers.Wallet(config.walletPrivateKey, provider);
     const erc20 = new ethers.utils.Interface(['function transfer(address to, uint256 value) returns (bool)']);
     const tx: Transaction = { to: tokenAddress, data: erc20.encodeFunctionData('transfer', [recipient, amountRaw]), value: '0' };
     let stage = 'relayer_safe_deploy';
-    let relayerUrl: RelayerUrlCandidate = RELAYER_URL_CHAIN[0];
+    let relayerUrl = relayerChain[0];
     try {
         let lastErr: unknown;
-        for (let i = 0; i < RELAYER_URL_CHAIN.length; i++) {
-            relayerUrl = RELAYER_URL_CHAIN[i];
+        for (let i = 0; i < relayerChain.length; i++) {
+            relayerUrl = relayerChain[i];
             try {
                 const relayerClient = buildRelayClient(config, wallet, relayerUrl);
                 stage = 'relayer_safe_deploy';
@@ -188,10 +207,10 @@ export async function executeRelayerWithdraw(config: ClaimExecutionConfig, recip
                 };
             } catch (err) {
                 lastErr = err;
-                if (i < RELAYER_URL_CHAIN.length - 1 && shouldRetryRelayerWithFallback(err)) {
+                if (i < relayerChain.length - 1 && shouldRetryRelayerWithFallback(err)) {
                     console.warn('[withdraw] relayer indisponível, tentando fallback', {
                         from: urlHostForLog(relayerUrl),
-                        to: urlHostForLog(RELAYER_URL_CHAIN[i + 1]),
+                        to: urlHostForLog(relayerChain[i + 1]),
                         error: formatRelayerError(err)
                     });
                     continue;
