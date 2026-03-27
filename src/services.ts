@@ -85,12 +85,13 @@ function buildRelayClient(config: ClaimExecutionConfig, wallet: ethers.Wallet, r
 }
 
 const RELAYER_URL_CHAIN = [RELAYER_URL_PRIMARY, RELAYER_URL_FALLBACK] as const;
+type RelayerUrlCandidate = (typeof RELAYER_URL_CHAIN)[number];
 
 export async function executeClaim(config: ClaimExecutionConfig) {
     const provider = createPolygonProvider(config.alchemyUrl);
     const wallet = new ethers.Wallet(config.walletPrivateKey, provider);
     let stage = 'redeem_create';
-    let relayerUrl = RELAYER_URL_CHAIN[0];
+    let relayerUrl: RelayerUrlCandidate = RELAYER_URL_CHAIN[0];
     try {
         const redeem = await fetchRedeemCreate(config.proxyWallet, config.redeemCreateUrl);
         stage = 'parse_markets';
@@ -157,7 +158,7 @@ export async function executeRelayerWithdraw(config: ClaimExecutionConfig, recip
     const erc20 = new ethers.utils.Interface(['function transfer(address to, uint256 value) returns (bool)']);
     const tx: Transaction = { to: tokenAddress, data: erc20.encodeFunctionData('transfer', [recipient, amountRaw]), value: '0' };
     let stage = 'relayer_safe_deploy';
-    let relayerUrl = RELAYER_URL_CHAIN[0];
+    let relayerUrl: RelayerUrlCandidate = RELAYER_URL_CHAIN[0];
     try {
         let lastErr: unknown;
         for (let i = 0; i < RELAYER_URL_CHAIN.length; i++) {
