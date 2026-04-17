@@ -15,7 +15,7 @@ import { buildOpenApiSpec } from './openapi';
 
 async function getClaimableValue(user: string): Promise<number | null> {
     const response = await fetch(`https://data-api.polymarket.com/value?user=${encodeURIComponent(user)}`);
-    if (!response.ok) throw new Error(`Falha ao buscar value: HTTP ${response.status}`);
+    if (!response.ok) throw new Error(`Failed to fetch claimable value: HTTP ${response.status}`);
     const data = (await response.json()) as Array<{ user: string; value: number }>;
     if (!Array.isArray(data) || data.length === 0) return null;
     return typeof data[0].value === 'number' ? data[0].value : null;
@@ -28,7 +28,7 @@ export function buildServer() {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Spike Wallet API Docs</title>
+    <title>Spike Polymarket API Docs</title>
     <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css" />
   </head>
   <body>
@@ -73,7 +73,7 @@ export function buildServer() {
                     res.writeHead(200, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ walletAddress }));
                 } catch (error) {
-                    const message = error instanceof Error ? error.message : 'Erro interno';
+                    const message = error instanceof Error ? error.message : 'Internal error';
                     res.writeHead(400, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ ok: false, error: message }));
                 }
@@ -85,13 +85,13 @@ export function buildServer() {
             (async () => {
                 try {
                     const user = url.searchParams.get('user');
-                    if (!user?.trim()) throw new Error('Query obrigatória: ?user=0x...');
+                    if (!user?.trim()) throw new Error('Required query: ?user=0x...');
                     const userAddr = parseEthereumAddress('user', user.trim());
                     const value = await getClaimableValue(userAddr);
                     res.writeHead(200, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ ok: true, user: userAddr, value }));
                 } catch (error) {
-                    const message = error instanceof Error ? error.message : 'Erro interno';
+                    const message = error instanceof Error ? error.message : 'Internal error';
                     res.writeHead(400, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ ok: false, error: message }));
                 }
@@ -106,7 +106,7 @@ export function buildServer() {
                     const address = url.searchParams.get('address');
                     const usdcContract = url.searchParams.get('usdcContract') || undefined;
                     if (!alchemyUrl || !address) {
-                        throw new Error('GET requer query: ?alchemyUrl=...&address=0x... (opcional usdcContract).');
+                        throw new Error('GET requires query: ?alchemyUrl=...&address=0x... (optional usdcContract).');
                     }
                     const result = await executeGetWalletBalance({
                         alchemyUrl: alchemyUrl.trim(),
@@ -116,7 +116,7 @@ export function buildServer() {
                     res.writeHead(200, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify(result));
                 } catch (error) {
-                    const message = error instanceof Error ? error.message : 'Erro interno';
+                    const message = error instanceof Error ? error.message : 'Internal error';
                     res.writeHead(400, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ ok: false, error: message }));
                 }
@@ -132,7 +132,7 @@ export function buildServer() {
                     res.writeHead(200, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify(result));
                 } catch (error) {
-                    const message = error instanceof Error ? error.message : 'Erro interno';
+                    const message = error instanceof Error ? error.message : 'Internal error';
                     res.writeHead(400, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ ok: false, error: message }));
                 }
@@ -149,7 +149,7 @@ export function buildServer() {
                     res.writeHead(200, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify(result));
                 } catch (error) {
-                    const message = error instanceof Error ? error.message : 'Erro interno';
+                    const message = error instanceof Error ? error.message : 'Internal error';
                     res.writeHead(400, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ ok: false, error: message }));
                 }
@@ -165,7 +165,7 @@ export function buildServer() {
                     res.writeHead(200, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify(result));
                 } catch (error) {
-                    const message = error instanceof Error ? error.message : 'Erro interno';
+                    const message = error instanceof Error ? error.message : 'Internal error';
                     res.writeHead(400, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ ok: false, error: message }));
                 }
@@ -181,7 +181,7 @@ export function buildServer() {
                     res.writeHead(200, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify(result));
                 } catch (error) {
-                    const message = error instanceof Error ? error.message : 'Erro interno';
+                    const message = error instanceof Error ? error.message : 'Internal error';
                     res.writeHead(400, { 'Content-Type': 'application/json' });
                     res.end(JSON.stringify({ ok: false, error: message }));
                 }

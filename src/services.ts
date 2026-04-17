@@ -22,7 +22,7 @@ import {
     urlHostForLog
 } from './utils';
 
-const REDEEM_FETCH_USER_AGENT = 'spike-wallet-api/1';
+const REDEEM_FETCH_USER_AGENT = 'spike-polymarket/1';
 
 export async function fetchRedeemCreate(proxyWallet: string, redeemCreateUrl?: string): Promise<RedeemCreateResponse> {
     const url = (redeemCreateUrl || DEFAULT_REDEEM_CREATE_URL).trim();
@@ -38,7 +38,7 @@ export async function fetchRedeemCreate(proxyWallet: string, redeemCreateUrl?: s
             headers.Origin = o;
             headers.Referer = o.endsWith('/') ? o : `${o}/`;
         } catch {
-            // ignora origin inválido
+            // ignore invalid origin
         }
     }
     const response = await fetch(url, {
@@ -114,7 +114,7 @@ export async function executeClaim(config: ClaimExecutionConfig) {
         const redeem = await fetchRedeemCreate(config.proxyWallet, config.redeemCreateUrl);
         stage = 'parse_markets';
         const markets = getRedeemMarkets(redeem);
-        if (markets.length === 0) throw new Error('Nenhum market resgatável retornado por /api/redeem/create.');
+        if (markets.length === 0) throw new Error('No redeemable markets returned from /api/redeem/create.');
         let lastErr: unknown;
         for (let i = 0; i < relayerChain.length; i++) {
             relayerUrl = relayerChain[i];
@@ -144,7 +144,7 @@ export async function executeClaim(config: ClaimExecutionConfig) {
             } catch (err) {
                 lastErr = err;
                 if (i < relayerChain.length - 1 && shouldRetryRelayerWithFallback(err)) {
-                    console.warn('[claim] relayer indisponível, tentando fallback', {
+                    console.warn('[claim] relayer unavailable, trying fallback', {
                         from: urlHostForLog(relayerUrl),
                         to: urlHostForLog(relayerChain[i + 1]),
                         error: formatRelayerError(err)
@@ -208,7 +208,7 @@ export async function executeRelayerWithdraw(config: ClaimExecutionConfig, recip
             } catch (err) {
                 lastErr = err;
                 if (i < relayerChain.length - 1 && shouldRetryRelayerWithFallback(err)) {
-                    console.warn('[withdraw] relayer indisponível, tentando fallback', {
+                    console.warn('[withdraw] relayer unavailable, trying fallback', {
                         from: urlHostForLog(relayerUrl),
                         to: urlHostForLog(relayerChain[i + 1]),
                         error: formatRelayerError(err)
@@ -251,21 +251,40 @@ export async function executeWithdrawToBinance(input: WithdrawToBinanceBody) {
     const minRaw = ethers.utils.parseUnits(String(input.minAmountUsdc ?? '0'), ERC20_DECIMALS);
     const { raw: balanceRaw, formatted: balanceFormatted } = await readUsdcBalance(provider, tokenAddress, sender);
     if (balanceRaw.lte(0)) {
-        return { ok: true, sent: false, reason: 'Saldo USDC é zero; nada a enviar.', sender, recipient, tokenAddress, usdcDisplayName: describeUsdcToken(tokenAddress), balanceUsdc: balanceFormatted };
+        return {
+            ok: true,
+            sent: false,
+            reason: 'USDC balance is zero; nothing to send.',
+            sender,
+            recipient,
+            tokenAddress,
+            usdcDisplayName: describeUsdcToken(tokenAddress),
+            balanceUsdc: balanceFormatted
+        };
     }
     const amountRaw = parsePositiveTokenAmount(input.amount, ERC20_DECIMALS);
     const amountFormatted = ethers.utils.formatUnits(amountRaw, ERC20_DECIMALS);
     if (amountRaw.lte(minRaw)) {
-        return { ok: true, sent: false, reason: `amount (${amountFormatted}) precisa ser maior que minAmountUsdc.`, sender, recipient, tokenAddress, usdcDisplayName: describeUsdcToken(tokenAddress), balanceUsdc: balanceFormatted };
+        return {
+            ok: true,
+            sent: false,
+            reason: `amount (${amountFormatted}) must be greater than minAmountUsdc.`,
+            sender,
+            recipient,
+            tokenAddress,
+            usdcDisplayName: describeUsdcToken(tokenAddress),
+            balanceUsdc: balanceFormatted
+        };
     }
-    if (amountRaw.gt(balanceRaw)) throw new Error(`Saldo insuficiente: tem ${balanceFormatted}, pediu ${amountFormatted}.`);
+    if (amountRaw.gt(balanceRaw))
+        throw new Error(`Insufficient balance: have ${balanceFormatted}, requested ${amountFormatted}.`);
     const contract = new ethers.Contract(tokenAddress, ERC20_MIN_ABI, wallet);
     const gasEstimate = await contract.estimateGas.transfer(recipient, amountRaw);
     const gasLimit = gasEstimate.mul(110).div(100);
     const gasPrice = await provider.getGasPrice();
     const gasCostWei = gasLimit.mul(gasPrice);
     const maticBal = await provider.getBalance(sender);
-    if (maticBal.lt(gasCostWei)) throw new Error('MATIC insuficiente para gás.');
+    if (maticBal.lt(gasCostWei)) throw new Error('Insufficient MATIC for gas.');
     const tx = await contract.transfer(recipient, amountRaw, { gasLimit, gasPrice });
     const receipt = await tx.wait();
     return {

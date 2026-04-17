@@ -8,15 +8,15 @@ function nonEmptyString(v: unknown): string | undefined {
 }
 
 export function validateClaimBody(body: unknown): ClaimRequestBody {
-    if (!body || typeof body !== 'object') throw new Error('Body inválido.');
+    if (!body || typeof body !== 'object') throw new Error('Invalid JSON body.');
     const p = body as Partial<ClaimRequestBody>;
     const missing: string[] = [];
     if (!nonEmptyString(p.walletPrivateKey)) missing.push('walletPrivateKey');
     if (!nonEmptyString(p.proxyWallet)) missing.push('proxyWallet');
     if (!nonEmptyString(p.alchemyUrl)) missing.push('alchemyUrl');
-    if (p.relayerTxType !== 'SAFE' && p.relayerTxType !== 'PROXY') missing.push('relayerTxType (SAFE ou PROXY)');
+    if (p.relayerTxType !== 'SAFE' && p.relayerTxType !== 'PROXY') missing.push('relayerTxType (SAFE or PROXY)');
     if (missing.length) {
-        throw new Error(`Faltam ou estão vazios: ${missing.join(', ')}.`);
+        throw new Error(`Missing or empty: ${missing.join(', ')}.`);
     }
     const relayerTxType = p.relayerTxType;
     return {
@@ -34,23 +34,23 @@ export function validateClaimBody(body: unknown): ClaimRequestBody {
 }
 
 export function validateWalletAddressBody(body: unknown): { walletPrivateKey: string } {
-    if (!body || typeof body !== 'object') throw new Error('Body inválido.');
+    if (!body || typeof body !== 'object') throw new Error('Invalid JSON body.');
     const pk = (body as { walletPrivateKey?: unknown }).walletPrivateKey;
-    if (typeof pk !== 'string' || !pk.trim()) throw new Error('walletPrivateKey é obrigatório.');
+    if (typeof pk !== 'string' || !pk.trim()) throw new Error('walletPrivateKey is required.');
     return { walletPrivateKey: pk.trim() };
 }
 
 export function validateWithdrawBody(body: unknown): WithdrawRequestBody {
-    if (!body || typeof body !== 'object') throw new Error('Body inválido.');
+    if (!body || typeof body !== 'object') throw new Error('Invalid JSON body.');
     const p = body as Partial<WithdrawRequestBody>;
     if (!p.walletPrivateKey || !p.alchemyUrl || !p.relayerApiKey || !p.relayerApiKeyAddress || !p.recipient) {
-        throw new Error('Campos obrigatórios: walletPrivateKey, alchemyUrl, relayerApiKey, relayerApiKeyAddress, recipient.');
+        throw new Error('Required fields: walletPrivateKey, alchemyUrl, relayerApiKey, relayerApiKeyAddress, recipient.');
     }
     if (p.relayerTxType !== 'SAFE' && p.relayerTxType !== 'PROXY') {
-        throw new Error("relayerTxType deve ser 'SAFE' ou 'PROXY'.");
+        throw new Error("relayerTxType must be 'SAFE' or 'PROXY'.");
     }
     if (p.amount === undefined || (typeof p.amount !== 'string' && typeof p.amount !== 'number')) {
-        throw new Error('amount é obrigatório.');
+        throw new Error('amount is required.');
     }
     return {
         walletPrivateKey: p.walletPrivateKey.trim(),
@@ -65,13 +65,13 @@ export function validateWithdrawBody(body: unknown): WithdrawRequestBody {
 }
 
 export function validateWithdrawToBinanceBody(body: unknown): WithdrawToBinanceBody {
-    if (!body || typeof body !== 'object') throw new Error('Body inválido.');
+    if (!body || typeof body !== 'object') throw new Error('Invalid JSON body.');
     const o = body as Record<string, unknown>;
     if (!o.walletPrivateKey || !o.alchemyUrl || !o.binanceAddress) {
-        throw new Error('Campos obrigatórios: walletPrivateKey, alchemyUrl, binanceAddress, amount.');
+        throw new Error('Required fields: walletPrivateKey, alchemyUrl, binanceAddress, amount.');
     }
     if (o.amount === undefined || o.amount === null || (typeof o.amount !== 'string' && typeof o.amount !== 'number')) {
-        throw new Error('amount é obrigatório.');
+        throw new Error('amount is required.');
     }
     return {
         walletPrivateKey: String(o.walletPrivateKey).trim(),
@@ -84,15 +84,15 @@ export function validateWithdrawToBinanceBody(body: unknown): WithdrawToBinanceB
 }
 
 export function validateGetWalletBalanceBody(body: unknown): GetWalletBalanceBody {
-    if (!body || typeof body !== 'object') throw new Error('Body inválido.');
+    if (!body || typeof body !== 'object') throw new Error('Invalid JSON body.');
     const o = body as Record<string, unknown>;
-    if (!o.alchemyUrl || typeof o.alchemyUrl !== 'string') throw new Error('alchemyUrl é obrigatório.');
+    if (!o.alchemyUrl || typeof o.alchemyUrl !== 'string') throw new Error('alchemyUrl is required.');
     const walletPrivateKey = typeof o.walletPrivateKey === 'string' ? o.walletPrivateKey.trim() : undefined;
     const address = typeof o.address === 'string' ? o.address.trim() : undefined;
-    if (!walletPrivateKey && !address) throw new Error('Informe address ou walletPrivateKey.');
+    if (!walletPrivateKey && !address) throw new Error('Provide address or walletPrivateKey.');
     if (walletPrivateKey && !walletPrivateKey.startsWith('0x')) {
         // lightweight sanity guard
-        throw new Error('walletPrivateKey inválida.');
+        throw new Error('Invalid walletPrivateKey.');
     }
     return {
         alchemyUrl: o.alchemyUrl.trim(),
@@ -112,7 +112,7 @@ export async function readJsonBody(req: import('http').IncomingMessage): Promise
     try {
         return JSON.parse(raw);
     } catch {
-        throw new Error('JSON inválido.');
+        throw new Error('Invalid JSON.');
     }
 }
 

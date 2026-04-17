@@ -24,7 +24,7 @@ export function resolveClaimConfig(payload: ClaimRequestBody): ClaimExecutionCon
             secret: builderSecret as string,
             passphrase: builderPassphrase as string
         });
-        if (!builderConfig.isValid()) throw new Error('Credenciais builder inválidas.');
+        if (!builderConfig.isValid()) throw new Error('Invalid builder credentials.');
         return {
             proxyWallet,
             walletPrivateKey,
@@ -37,13 +37,15 @@ export function resolveClaimConfig(payload: ClaimRequestBody): ClaimExecutionCon
 
     if (!hasRelayerKeys) {
         throw new Error(
-            'Informe relayerApiKey + relayerApiKeyAddress, ou builderApiKey + builderSecret + builderPassphrase no body.'
+            'Provide relayerApiKey + relayerApiKeyAddress, or builderApiKey + builderSecret + builderPassphrase in the body.'
         );
     }
     const relayerApiKey = payload.relayerApiKey!.trim();
     const relayerApiKeyAddress = parseEthereumAddress('relayerApiKeyAddress', payload.relayerApiKeyAddress!.trim());
     if (signerAddress.toLowerCase() !== relayerApiKeyAddress.toLowerCase()) {
-        throw new Error(`relayerApiKeyAddress (${relayerApiKeyAddress}) precisa ser o mesmo da walletPrivateKey (${signerAddress}).`);
+        throw new Error(
+            `relayerApiKeyAddress (${relayerApiKeyAddress}) must match the address derived from walletPrivateKey (${signerAddress}).`
+        );
     }
     return {
         proxyWallet,
@@ -65,7 +67,9 @@ export function resolveWithdrawConfigFromBody(body: WithdrawRequestBody): {
     const signerAddress = parseEthereumAddress('walletPrivateKey', new ethers.Wallet(body.walletPrivateKey).address);
     const relayerKeyAddress = parseEthereumAddress('relayerApiKeyAddress', body.relayerApiKeyAddress);
     if (signerAddress.toLowerCase() !== relayerKeyAddress.toLowerCase()) {
-        throw new Error(`relayerApiKeyAddress (${relayerKeyAddress}) precisa ser o mesmo da walletPrivateKey (${signerAddress}).`);
+        throw new Error(
+            `relayerApiKeyAddress (${relayerKeyAddress}) must match the address derived from walletPrivateKey (${signerAddress}).`
+        );
     }
     const recipient = parseEthereumAddress('recipient', body.recipient);
     const tokenAddress = body.tokenAddress ? parseEthereumAddress('tokenAddress', body.tokenAddress) : USDC_POS;

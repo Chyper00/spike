@@ -11,25 +11,25 @@ export function parseEthereumAddress(label: string, raw: string): string {
     if (!/^0x[a-fA-F0-9]{40}$/u.test(s)) {
         const hexDigits = s.startsWith('0x') ? s.length - 2 : s.length;
         throw new Error(
-            `${label} inválido: precisa ser 0x + 40 caracteres hex (42 no total). ` +
-                `Recebido: ${s.length} caracteres (${hexDigits} hex).`
+            `${label} is invalid: expected 0x + 40 hex characters (42 total). ` +
+                `Got ${s.length} characters (${hexDigits} hex).`
         );
     }
     try {
         return ethers.utils.getAddress(s);
     } catch {
-        throw new Error(`${label} inválido (checksum).`);
+        throw new Error(`${label} is invalid (checksum).`);
     }
 }
 
 export function parsePositiveTokenAmount(amount: string | number, decimals = ERC20_DECIMALS): ethers.BigNumber {
     const raw = typeof amount === 'number' ? String(amount) : amount.trim();
     if (!/^\d+(\.\d+)?$/u.test(raw)) {
-        throw new Error('amount inválido. Use número positivo, ex: "10.5".');
+        throw new Error('amount is invalid. Use a positive number, e.g. "10.5".');
     }
     const parsed = ethers.utils.parseUnits(raw, decimals);
     if (parsed.lte(0)) {
-        throw new Error('amount deve ser maior que zero.');
+        throw new Error('amount must be greater than zero.');
     }
     return parsed;
 }
@@ -42,7 +42,7 @@ export function describeUsdcToken(tokenChecksummed: string): string {
     const a = tokenChecksummed.toLowerCase();
     if (a === USDC_POS.toLowerCase()) return 'USD Coin (PoS) (USDC.e)';
     if (a === USDC_NATIVE.toLowerCase()) return 'USDC (native Circle)';
-    return 'ERC-20 (usdcContract customizado)';
+    return 'ERC-20 (custom usdcContract)';
 }
 
 export function buildBuilderConfigFromBody(creds: { key: string; secret: string; passphrase: string }): BuilderConfig {
@@ -68,14 +68,14 @@ function formatParsedRelayerPayload(parsed: RelayerJsonError): string {
         const d = parsed.data as { error?: string };
         if (d.error === 'invalid authorization') {
             return (
-                'Relayer 401 invalid authorization. Verifique relayerApiKey e relayerApiKeyAddress. ' +
-                `Detalhe: ${JSON.stringify(parsed)}`
+                'Relayer 401 invalid authorization. Check relayerApiKey and relayerApiKeyAddress. ' +
+                `Detail: ${JSON.stringify(parsed)}`
             );
         }
     }
     if (parsed.error === 'connection error') {
         const parts = [
-            'Relayer: falha de rede (sem resposta HTTP).',
+            'Relayer: network failure (no HTTP response).',
             parsed.axiosMessage && `axios: ${parsed.axiosMessage}`,
             parsed.code && `code: ${parsed.code}`,
             parsed.errno !== undefined && `errno: ${parsed.errno}`,
@@ -110,14 +110,14 @@ export function formatRelayerError(err: unknown): string {
     return msg;
 }
 
-/** True se vale a pena tentar o URL de relayer fallback (rede, 5xx, 404). */
+/** Whether to retry with the fallback relayer URL (network errors, some 5xx/404). */
 export function shouldRetryRelayerWithFallback(err: unknown): boolean {
     const text = formatRelayerError(err);
     const lower = text.toLowerCase();
     if (lower.includes('401') && (lower.includes('invalid authorization') || lower.includes('relayer 401'))) return false;
     if (lower.includes('403')) return false;
     if (/\b(econnrefused|enotfound|etimedout|econnreset|eai_again|enetunreach|ehostunreach|ecanceled)\b/i.test(text)) return true;
-    if (lower.includes('falha de rede') || lower.includes('sem resposta http')) return true;
+    if (lower.includes('network failure') || lower.includes('no http response')) return true;
     const m = /relayer http (\d+)/i.exec(text);
     if (m) {
         const code = parseInt(m[1], 10);
@@ -126,18 +126,18 @@ export function shouldRetryRelayerWithFallback(err: unknown): boolean {
     return false;
 }
 
-/** Hostname para logs (evita path/query com segredos em URLs). */
+/** Hostname for logs (avoids logging path/query that may contain secrets). */
 export function urlHostForLog(url: string): string {
     try {
         return new URL(url.trim()).host;
     } catch {
-        return '(url inválida)';
+        return '(invalid url)';
     }
 }
 
 const REDEEM_CREATE_BODY_LOG_MAX = 2048;
 
-/** Corpo de erro HTTP para mensagens (truncado). Extrai `error`/`message` se JSON. */
+/** Format HTTP error body for messages (truncated). Pulls `error`/`message` when JSON. */
 export function formatRedeemCreateErrorResponse(status: number, bodyText: string): string {
     const trimmed = bodyText.trim();
     const truncated =
@@ -145,7 +145,7 @@ export function formatRedeemCreateErrorResponse(status: number, bodyText: string
             ? `${trimmed.slice(0, REDEEM_CREATE_BODY_LOG_MAX)}…`
             : trimmed;
     if (!truncated) {
-        return `Falha no redeem/create: HTTP ${status} (resposta sem corpo)`;
+        return `redeem/create failed: HTTP ${status} (empty response body)`;
     }
     try {
         const j = JSON.parse(truncated) as { error?: unknown; message?: unknown };
@@ -153,9 +153,9 @@ export function formatRedeemCreateErrorResponse(status: number, bodyText: string
             (typeof j.error === 'string' && j.error) ||
             (typeof j.message === 'string' && j.message) ||
             truncated;
-        return `Falha no redeem/create: HTTP ${status} — ${detail}`;
+        return `redeem/create failed: HTTP ${status} — ${detail}`;
     } catch {
-        return `Falha no redeem/create: HTTP ${status} — ${truncated}`;
+        return `redeem/create failed: HTTP ${status} — ${truncated}`;
     }
 }
 
@@ -164,7 +164,7 @@ export function rethrowIfRpcAuthFailed(err: unknown, context: string): never {
     const lower = msg.toLowerCase();
     if (msg.includes('Must be authenticated') || (lower.includes('server_error') && msg.includes('401')) || msg.includes('"status":401')) {
         throw new Error(
-            `${context}: RPC respondeu 401 (Alchemy). Verifique se alchemyUrl está completa e com API key válida.`
+            `${context}: RPC returned 401 (Alchemy). Ensure alchemyUrl is complete and includes a valid API key.`
         );
     }
     throw err instanceof Error ? err : new Error(String(err));
