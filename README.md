@@ -8,7 +8,7 @@ If this project saves you time, donations on **Polygon** (chain ID **137**) are 
 
 ---
 
-**Spike Polymarket** (`spike-polymarket`) is a small, focused HTTP service for [Polymarket](https://polymarket.com) workflows on **Polygon (chain ID 137)**. It wraps redeem creation, relayer-backed transactions, and wallet utilities so you can claim positions, move USDC, and integrate with exchange payouts from your own backend.
+**Spike Polymarket** (`spike-polymarket`) is a small, focused HTTP service for [Polymarket](https://polymarket.com) workflows on **Polygon (chain ID 137)**. It wraps redeem creation, relayer-backed transactions, and wallet utilities so you can **claim redeemable positions without using the website’s Claim button**, move USDC, and integrate with exchange payouts from your own backend.
 
 Built with **TypeScript** and **Node.js**, it ships with **OpenAPI** and **Swagger UI** out of the box.
 
@@ -16,7 +16,7 @@ Built with **TypeScript** and **Node.js**, it ships with **OpenAPI** and **Swagg
 
 ## Why this exists
 
-Polymarket trading lives on-chain and behind Polymarket’s relayer and redeem APIs. This project bundles the common path in one place: fetch redeemable markets, submit `redeemPositions` calls via the builder relayer client, read balances over your RPC, and optional Binance-oriented withdrawal helpers—without you re-wiring the same Polymarket SDK calls every time.
+The main motivation is **programmatic claim**: settle or redeem winning positions **from your own script or server**, instead of opening [polymarket.com](https://polymarket.com) and clicking **Claim** for each batch. Polymarket still expects the same on-chain and relayer flow; this service wires **redeem-create → `redeemPositions` → relayer** in one HTTP API, plus balance and withdrawal helpers so you are not re-implementing the same Polymarket SDK steps every time.
 
 ---
 
@@ -41,7 +41,7 @@ Polymarket trading lives on-chain and behind Polymarket’s relayer and redeem A
 ## Quick start
 
 ```bash
-git clone <your-repo-url> spike
+git clone git@github.com:Chyper00/spike.git
 cd spike
 npm install
 npm run dev
@@ -80,7 +80,22 @@ Credentials (private keys, relayer API keys, builder HMAC fields) are **not** re
 | OpenAPI JSON | `GET /openapi.json` |
 | Human-readable reference | [docs/API.md](docs/API.md) |
 
-Notable routes include **`GET /health`**, **`POST /wallet-address`**, **`GET /claimable`**, **`GET` / `POST /get_wallet_balance`**, **`POST /claim`**, **`POST /withdraw`**, and **`POST /withdraw_to_binance`**. Full schemas and examples live in the docs above.
+### HTTP routes
+
+| Method | Route | Description |
+| ------ | ----- | ----------- |
+| `GET` | `/health` | Liveness check (`{ "ok": true }`). |
+| `GET` | `/docs` | Swagger UI (loads `/openapi.json`). |
+| `GET` | `/openapi.json` | Machine-readable OpenAPI document. |
+| `POST` | `/wallet-address` | Derive checksummed address from `walletPrivateKey` in JSON body. |
+| `GET` | `/claimable` | Polymarket claimable portfolio value; query `?user=0x…`. |
+| `GET` | `/get_wallet_balance` | USDC + MATIC via RPC; query `?alchemyUrl=…&address=0x…` (optional `usdcContract`). |
+| `POST` | `/get_wallet_balance` | Same balances as GET; JSON body with `alchemyUrl` and `address` **or** `walletPrivateKey`. |
+| `POST` | `/claim` | Redeem / claim flow (redeem-create → relayer). |
+| `POST` | `/withdraw` | Relayer-sponsored ERC-20 transfer (default USDC). |
+| `POST` | `/withdraw_to_binance` | On-chain USDC transfer to a Binance deposit address (gas in MATIC). |
+
+Unknown paths or unsupported methods return **404** `{ "error": "Not Found" }`. Request/response schemas and examples: [docs/API.md](docs/API.md) and **`GET /openapi.json`**.
 
 ---
 

@@ -243,8 +243,6 @@ On-chain **`transfer`** of USDC (or `usdcContract`) from `walletPrivateKey` to `
 }
 ```
 
-**Compatibility alias:** `POST /widraw_to_binance` is accepted as a **typo alias** for the same handler.
-
 ---
 
 ## Operational notes

@@ -157,7 +157,7 @@ export function buildServer() {
             return;
         }
 
-        if (req.method === 'POST' && (pathname === '/withdraw_to_binance' || pathname === '/widraw_to_binance')) {
+        if (req.method === 'POST' && pathname === '/withdraw_to_binance') {
             (async () => {
                 try {
                     const parsed = validateWithdrawToBinanceBody(await readJsonBody(req));
