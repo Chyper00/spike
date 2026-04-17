@@ -95,7 +95,111 @@ Credentials (private keys, relayer API keys, builder HMAC fields) are **not** re
 | `POST` | `/withdraw` | Relayer-sponsored ERC-20 transfer (default USDC). |
 | `POST` | `/withdraw_to_binance` | On-chain USDC transfer to a Binance deposit address (gas in MATIC). |
 
-Unknown paths or unsupported methods return **404** `{ "error": "Not Found" }`. Request/response schemas and examples: [docs/API.md](docs/API.md) and **`GET /openapi.json`**.
+Unknown paths or unsupported methods return **404** `{ "error": "Not Found" }`. Full schemas: [docs/API.md](docs/API.md) and **`GET /openapi.json`**.
+
+### Where each value comes from
+
+| Field | Where to get it |
+| ----- | ---------------- |
+| `walletPrivateKey` | Your Polygon **EOA** private key (e.g. exported from your wallet). **Never** share it or send it to random websites—only to backends you control. Must match `relayerApiKeyAddress` for relayer auth. |
+| `proxyWallet` | The Polymarket **proxy / trading** address tied to your account (the wallet Polymarket uses for positions and redeem-create). While logged in, check [Polymarket](https://polymarket.com) profile/wallet UI or the same value you see when claiming in the browser; it may differ from your EOA. |
+| `alchemyUrl` | A **Polygon (chain 137) JSON-RPC HTTPS URL**. Common source: [Alchemy](https://www.alchemy.com/) → create an app on **Polygon PoS** → copy the HTTPS endpoint. Any Polygon RPC provider works. |
+| `relayerApiKey` + `relayerApiKeyAddress` | Polymarket **Relayer API key** for your address: create/manage under Polymarket account **Settings → API Keys** (see [Relayer client — Authentication](https://docs.polymarket.com/developers/builders/relayer-client)). `relayerApiKeyAddress` **must** be the same address as `new Wallet(walletPrivateKey).address`. |
+| `relayerTxType` | Either `SAFE` or `PROXY`—must match how your Polymarket account is set up for relayer transactions. |
+| `builderApiKey`, `builderSecret`, `builderPassphrase` | **Alternative to** relayer keys on **`POST /claim` only**: create at [polymarket.com/settings?tab=builder](https://polymarket.com/settings?tab=builder) (see [Builder API keys](https://docs.polymarket.com/builders/api-keys)). |
+| `recipient` (`/withdraw`) | Any valid Polygon `0x` address you want to receive USDC. |
+| `binanceAddress` | In the **Binance** app or site: **Deposit** → **USDC** → network **Polygon** → copy the deposit address shown. |
+| `amount` | Human amount (e.g. USDC to send); see [docs/API.md](docs/API.md) for precision rules. |
+
+**Relayer host (not in JSON):** requests do **not** include `relayerUrl`. The running server calls Polymarket’s relayer in order: primary then fallback (defaults in [src/constants.ts](src/constants.ts)). Override with **`POLYMARKET_RELAYER_PRIMARY`** / **`POLYMARKET_RELAYER_FALLBACK`** (see [Configuration](#configuration)). Typical primary URL: `https://relayer-v2.polymarket.com`.
+
+### Example: `POST /claim`
+
+Relayer API key mode (replace placeholders; keep keys server-side only):
+
+```json
+{
+  "proxyWallet": "0xYourPolymarketProxyWallet",
+  "walletPrivateKey": "0xYourEoaPrivateKey",
+  "alchemyUrl": "https://polygon-mainnet.g.alchemy.com/v2/YOUR_ALCHEMY_KEY",
+  "relayerApiKey": "YOUR_RELAYER_API_KEY",
+  "relayerApiKeyAddress": "0xSameAddressAsEoaFromPrivateKey",
+  "relayerTxType": "SAFE"
+}
+```
+
+Builder HMAC mode instead of relayer keys (same required base fields, swap auth):
+
+```json
+{
+  "proxyWallet": "0xYourPolymarketProxyWallet",
+  "walletPrivateKey": "0xYourEoaPrivateKey",
+  "alchemyUrl": "https://polygon-mainnet.g.alchemy.com/v2/YOUR_ALCHEMY_KEY",
+  "relayerTxType": "SAFE",
+  "builderApiKey": "…",
+  "builderSecret": "…",
+  "builderPassphrase": "…"
+}
+```
+
+Optional: `redeemCreateUrl` to override the default redeem-create HTTP URL.
+
+### Example: `POST /withdraw`
+
+```json
+{
+  "walletPrivateKey": "0x…",
+  "alchemyUrl": "https://polygon-mainnet.g.alchemy.com/v2/…",
+  "relayerApiKey": "…",
+  "relayerApiKeyAddress": "0x…",
+  "relayerTxType": "SAFE",
+  "recipient": "0x…",
+  "amount": "10.5",
+  "tokenAddress": "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
+}
+```
+
+`tokenAddress` is optional (defaults to Polygon PoS USDC). Keys: same relayer + RPC sources as `/claim`.
+
+### Example: `POST /withdraw_to_binance`
+
+```json
+{
+  "walletPrivateKey": "0x…",
+  "alchemyUrl": "https://polygon-mainnet.g.alchemy.com/v2/…",
+  "binanceAddress": "0x…",
+  "amount": "25",
+  "minAmountUsdc": "0",
+  "usdcContract": "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
+}
+```
+
+`minAmountUsdc` and `usdcContract` are optional. **Gas is paid in MATIC** from the same `walletPrivateKey` wallet.
+
+### Example: `POST /wallet-address`
+
+```json
+{
+  "walletPrivateKey": "0x…"
+}
+```
+
+### Example: `POST /get_wallet_balance`
+
+Either `address` or `walletPrivateKey` (must start with `0x`):
+
+```json
+{
+  "alchemyUrl": "https://polygon-mainnet.g.alchemy.com/v2/…",
+  "address": "0x…",
+  "usdcContract": "0x2791Bca1f2de4661ED88A30C99A7a9449Aa84174"
+}
+```
+
+### Quick `GET` examples
+
+- **Claimable (Polymarket data API):** `GET /claimable?user=0x…`
+- **Balances over RPC:** `GET /get_wallet_balance?alchemyUrl=https%3A%2F%2F…&address=0x…` (optional `&usdcContract=0x…`)
 
 ---
 
